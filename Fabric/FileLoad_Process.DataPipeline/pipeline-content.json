@@ -1,0 +1,404 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "GetMetadata",
+        "typeProperties": {
+          "datasetSettings": {
+            "type": "Excel",
+            "typeProperties": {
+              "location": {
+                "type": "LakehouseLocation",
+                "folderPath": "Source"
+              },
+              "sheetName": "Sales"
+            },
+            "schema": [],
+            "linkedService": {
+              "name": "lakehouse",
+              "properties": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "artifactId": "c7340adb-c825-a9d2-445f-2e02da2d3198",
+                  "workspaceId": "00000000-0000-0000-0000-000000000000",
+                  "rootFolder": "Files"
+                },
+                "annotations": []
+              }
+            },
+            "annotations": []
+          },
+          "fieldList": [
+            "childItems"
+          ],
+          "storeSettings": {
+            "type": "LakehouseReadSettings",
+            "recursive": true,
+            "enablePartitionDiscovery": false,
+            "modifiedDatetimeStart": {
+              "value": "@variables('v_last_run_time')",
+              "type": "Expression"
+            }
+          }
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Get Sales",
+        "dependsOn": [
+          {
+            "activity": "Set last_run_time",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "GetMetadata",
+        "typeProperties": {
+          "datasetSettings": {
+            "type": "Excel",
+            "typeProperties": {
+              "location": {
+                "type": "LakehouseLocation",
+                "folderPath": "Source"
+              },
+              "sheetName": "Returns"
+            },
+            "schema": [],
+            "linkedService": {
+              "name": "lakehouse",
+              "properties": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "artifactId": "c7340adb-c825-a9d2-445f-2e02da2d3198",
+                  "workspaceId": "00000000-0000-0000-0000-000000000000",
+                  "rootFolder": "Files"
+                },
+                "annotations": []
+              }
+            },
+            "annotations": []
+          },
+          "fieldList": [
+            "childItems"
+          ],
+          "storeSettings": {
+            "type": "LakehouseReadSettings",
+            "enablePartitionDiscovery": false,
+            "modifiedDatetimeStart": {
+              "value": "@variables('v_last_run_time')",
+              "type": "Expression"
+            }
+          }
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Get Returns",
+        "dependsOn": [
+          {
+            "activity": "Set last_run_time",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "ForEach",
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "value": "@activity('Get Sales').output.childItems",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "v_file_path",
+                "value": {
+                  "value": "@item().name",
+                  "type": "Expression"
+                }
+              },
+              "policy": {
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Set File Path",
+              "dependsOn": []
+            },
+            {
+              "type": "TridentNotebook",
+              "typeProperties": {
+                "notebookId": "14441ea4-75cc-a568-4682-46aad218af8f",
+                "workspaceId": "00000000-0000-0000-0000-000000000000",
+                "parameters": {
+                  "filepath": {
+                    "value": {
+                      "value": "@variables('v_file_path')",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  }
+                }
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Sales",
+              "dependsOn": [
+                {
+                  "activity": "Set File Path",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "v_sales_file_date",
+                "value": {
+                  "value": "@substring(\n    replace(variables('v_file_path'),'.xlsx','')\n    ,\n    sub(\n        length(replace(variables('v_file_path'),'.xlsx',''))\n         ,8\n         )\n,8)",
+                  "type": "Expression"
+                }
+              },
+              "policy": {
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Set Sales File Date",
+              "dependsOn": [
+                {
+                  "activity": "Set File Path",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "SqlServerStoredProcedure",
+              "typeProperties": {
+                "storedProcedureName": "[gold].[USP_SALES_LOAD]",
+                "storedProcedureParameters": {
+                  "filedate": {
+                    "value": {
+                      "value": "@variables('v_sales_file_date')",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  }
+                }
+              },
+              "linkedService": {
+                "name": "warehouse",
+                "properties": {
+                  "type": "DataWarehouse",
+                  "typeProperties": {
+                    "artifactId": "1d76ed3b-cb3b-4abe-90e1-7c118b569b03",
+                    "endpoint": "y4gynvhhxnhenlo4hv3hew5h7a-wmeskswxnwxulcazlzdlbstujq.datawarehouse.fabric.microsoft.com",
+                    "workspaceId": "4a2509b3-6dd7-45af-8819-5e46b0ca744c"
+                  },
+                  "annotations": []
+                }
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Gold Sales Load",
+              "dependsOn": [
+                {
+                  "activity": "Set Sales File Date",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "Sales",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "name": "ForEachFile",
+        "dependsOn": [
+          {
+            "activity": "Get Sales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "ForEach",
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "value": "@activity('Get Returns').output.childItems",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "v_return_path",
+                "value": {
+                  "value": "@item().name",
+                  "type": "Expression"
+                }
+              },
+              "policy": {
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Set File Path of Return",
+              "dependsOn": []
+            },
+            {
+              "type": "TridentNotebook",
+              "typeProperties": {
+                "notebookId": "47f8a57a-c053-8763-4239-d3a3996261bb",
+                "workspaceId": "00000000-0000-0000-0000-000000000000",
+                "parameters": {
+                  "filepath": {
+                    "value": {
+                      "value": "@variables('v_return_path')",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  }
+                }
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Returns",
+              "dependsOn": [
+                {
+                  "activity": "Set File Path of Return",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "name": "ForEachReturn",
+        "dependsOn": [
+          {
+            "activity": "Get Returns",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Lookup",
+        "typeProperties": {
+          "source": {
+            "type": "DataWarehouseSource",
+            "sqlReaderQuery": "select MAX(LoadTime) as max_load_time from warehouse.gold.watermark",
+            "partitionOption": "None",
+            "queryTimeout": "02:00:00"
+          },
+          "datasetSettings": {
+            "type": "DataWarehouseTable",
+            "schema": [],
+            "linkedService": {
+              "name": "warehouse",
+              "properties": {
+                "type": "DataWarehouse",
+                "typeProperties": {
+                  "artifactId": "1d76ed3b-cb3b-4abe-90e1-7c118b569b03",
+                  "endpoint": "y4gynvhhxnhenlo4hv3hew5h7a-wmeskswxnwxulcazlzdlbstujq.datawarehouse.fabric.microsoft.com",
+                  "workspaceId": "4a2509b3-6dd7-45af-8819-5e46b0ca744c"
+                },
+                "annotations": []
+              }
+            },
+            "annotations": []
+          }
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Lookup LastRun",
+        "dependsOn": []
+      },
+      {
+        "type": "SetVariable",
+        "typeProperties": {
+          "variableName": "v_last_run_time",
+          "value": {
+            "value": "@activity('Lookup LastRun').output.firstRow.max_load_time",
+            "type": "Expression"
+          }
+        },
+        "policy": {
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Set last_run_time",
+        "dependsOn": [
+          {
+            "activity": "Lookup LastRun",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ],
+    "variables": {
+      "v_file_path": {
+        "type": "String"
+      },
+      "v_return_path": {
+        "type": "String"
+      },
+      "v_sales_file_date": {
+        "type": "String"
+      },
+      "v_last_run_time": {
+        "type": "String"
+      }
+    },
+    "concurrency": 1
+  }
+}

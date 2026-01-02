@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Environment",
+    "displayName": "excel-Env-01",
+    "description": "Environment"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "d8b106dc-28bd-b65b-483c-036cd5522bfe"
+  }
+}
